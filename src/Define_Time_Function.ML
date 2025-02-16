@@ -372,27 +372,21 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
       | check_for_fun' false (f as Type ("fun", [_,_])) = change_typ' (K true) f
       | check_for_fun' _ t = t
     val change_typ = change_typ' (K true)
-    fun time_term ctxt s (Const (nm,T)) =
-    let
-      val T_nm = fun_name_to_time ctxt s nm
-      val T_T = change_typ T
-    in
-    (SOME (Syntax.check_term ctxt (Const (T_nm,T_T))))
-      handle (ERROR _) =>
-        case Syntax.read_term ctxt (Long_Name.base_name T_nm)
-          of (Const (T_nm,T_T)) =>
-            let
-              fun col_Used i (Type ("fun", [Type ("fun", _), Ts])) (Type ("fun", [T', Ts'])) =
-                (if is_Used T' then [i] else []) @ col_Used (i+1) Ts Ts'
-                | col_Used i (Type ("fun", [_, Ts])) (Type ("fun", [_, Ts'])) = col_Used (i+1) Ts Ts'
-                | col_Used _ _ _ = []
-              val binderT = change_typ' (contains (col_Used 0 T T_T)) T |> Term.binder_types
-              val finT = Term.body_type T_T
-            in
-              SOME (Const (T_nm, binderT ---> finT))
-            end
-           | _ => error ("Timing function of " ^ nm ^ " is not defined")
-    end
+    fun time_term ctxt s (t as Const (nm,T)) =
+      (case Time_Mapping.get_time_function (Local_Theory.exit_global ctxt) t
+        of SOME (Const (T_nm,T_T)) =>
+          let
+            fun col_Used i (Type ("fun", [Type ("fun", _), Ts])) (Type ("fun", [T', Ts'])) =
+              (if is_Used T' then [i] else []) @ col_Used (i+1) Ts Ts'
+              | col_Used i (Type ("fun", [_, Ts])) (Type ("fun", [_, Ts'])) = col_Used (i+1) Ts Ts'
+              | col_Used _ _ _ = []
+            val binderT = change_typ' (contains (col_Used 0 T T_T)) T |> Term.binder_types
+            val finT = Term.body_type T_T
+          in
+            SOME (Const (T_nm, binderT ---> finT))
+          end
+         | SOME _ => error ("Invalid timing function declared for " ^ nm)
+         | NONE => error ("Timing function of " ^ nm ^ " is not defined"))
       | time_term _ _ _ = error "Internal error: No valid function given"
 
     fun opt_term NONE = zero
@@ -401,13 +395,12 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
       | use_origin t = t
     
     (* Conversion of function term *)
-    fun fun_to_time' ctxt (origin: term list) second (func as Const (nm,T)) =
+    fun fun_to_time' ctxt (origin: term list) second (func as Const (_,T)) =
     let
       val origin' = map (fst o strip_comb) origin
     in
       if contains' const_comp origin' func then SOME (Free (func |> Term.term_name |> fun_name_to_time' ctxt true second, change_typ T)) else
-      if Zero_Funcs.is_zero (Proof_Context.theory_of ctxt) (nm,T) then NONE else
-        time_term ctxt false func
+      time_term ctxt false func
     end
       | fun_to_time' _ _ _ (Free (nm,T)) =
           SOME (HOLogic.mk_snd (Free (nm,HOLogic.mk_prodT (T,change_typ' (K true) T))))
@@ -890,8 +883,10 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
           {sequential=seq, default=NONE, domintros=true, partials=false}
       in
         if #partial config
-        then Partial_Function.add_partial_function "option" bindings part_specs lthy |>> PartialFunction o snd
-        else Function.add_function bindings specs fun_config pat_completeness_auto lthy |>> Function
+        then Partial_Function.add_partial_function "option" bindings part_specs lthy
+              |>> PartialFunction o snd
+        else Function.add_function bindings specs fun_config pat_completeness_auto lthy
+              |>> Function
       end
 
     val (info,ctxt) = 
@@ -902,6 +897,11 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
           register true
 
     val ctxt = if simpable then calculateSimplifications ctxt T_terms term simpables else ctxt
+    
+    val mappings = map2 (fn term => fn (binding,_,_) =>
+          (term, Const (Local_Theory.full_name ctxt binding, change_typ (dest_Const_type term))))
+          term bindings
+    val ctxt = fold (fn (t,T_t) => fn lthy => Time_Mapping.register_time_function lthy t T_t) mappings ctxt
   in
     (info, ctxt)
   end

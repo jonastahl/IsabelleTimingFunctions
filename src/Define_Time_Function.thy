@@ -14,10 +14,11 @@ theory Define_Time_Function
     and    "time_definition" :: thy_decl
     and    "time_partial_function" :: thy_decl
     and    "equations"
-    and    "time_fun_0" :: thy_decl
+    and    "register_time_fun" :: thy_decl
+    and    "delete_time_fun" :: thy_decl
 begin
 
-ML_file Define_Time_0.ML
+ML_file Define_Time_Mapping.ML
 ML_file Define_Time_Function.ML
 
 declare [[time_prefix = "T_"]]
