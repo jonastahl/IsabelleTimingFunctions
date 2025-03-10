@@ -10,7 +10,7 @@ end
 structure Time_Mapping : TIME_MAPPING =
 struct
 
-structure TimeMapping = Theory_Data(
+structure TimeMapping = Generic_Data(
   type T = term Net.net
   val empty = Net.empty
   val merge = Net.merge Term.eq_Const_name
@@ -27,7 +27,7 @@ end
 fun get_time_function lthy t =
 let
 in
-  case Net.match_term (TimeMapping.get (Local_Theory.exit_global lthy)) t
+  case Net.match_term (TimeMapping.get (Context.Proof lthy)) t
         |> filter (fn t' => body_types_match lthy t' t)
       of
     [] => NONE
@@ -43,9 +43,8 @@ in
   case get_time_function lthy t
     of SOME _ => error "Time function already registered for this term"
      | NONE =>
-        Local_Theory.background_theory
-          (TimeMapping.map (Net.insert_term (apply2 fastype_of #> Type.could_unify) (t_gen, T_t_gen)))
-          lthy
+        TimeMapping.map (Net.insert_term (apply2 fastype_of #> Type.could_unify) (t_gen, T_t_gen)) (Context.Proof lthy)
+          |> Context.proof_of
 end
 
 fun register (func, T_func) lthy =
@@ -67,8 +66,8 @@ fun delete func lthy =
 let
   val t = Syntax.read_term lthy func
 in
-  Local_Theory.background_theory
-    (TimeMapping.map (Net.delete_term (K true) (t, get_time_function lthy t |> the))) lthy
+  TimeMapping.map (Net.delete_term (K true) (t, get_time_function lthy t |> the)) (Context.Proof lthy)
+    |> Context.proof_of
 end
 
 val _ =
