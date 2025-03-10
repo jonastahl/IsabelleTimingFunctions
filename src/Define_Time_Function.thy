@@ -51,19 +51,4 @@ as long as the comparison is of the form \<open>t = c\<close> where \<open>c\<cl
 Users of this running time framework need to ensure that 0-time functions are used only
 within the above restrictions.\<close>
 
-time_fun_0 "min"
-time_fun_0 "max"
-time_fun_0 "(+)"
-time_fun_0 "(-)"
-time_fun_0 "(*)"
-time_fun_0 "(/)"
-time_fun_0 "(div)"
-time_fun_0 "(<)"
-time_fun_0 "(\<le>)"
-time_fun_0 "Not"
-time_fun_0 "(\<and>)"
-time_fun_0 "(\<or>)"
-time_fun_0 "Num.numeral_class.numeral"
-time_fun_0 "(=)"
-
 end

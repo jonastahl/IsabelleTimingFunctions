@@ -372,8 +372,8 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
       | check_for_fun' false (f as Type ("fun", [_,_])) = change_typ' (K true) f
       | check_for_fun' _ t = t
     val change_typ = change_typ' (K true)
-    fun time_term ctxt s (t as Const (nm,T)) =
-      (case Time_Mapping.get_time_function (Local_Theory.exit_global ctxt) t
+    fun time_term ctxt _ (t as Const (nm,T)) =
+      (case Time_Mapping.get_time_function ctxt t
         of SOME (Const (T_nm,T_T)) =>
           let
             fun col_Used i (Type ("fun", [Type ("fun", _), Ts])) (Type ("fun", [T', Ts'])) =
