@@ -358,6 +358,10 @@ time_fun map
 lemma "t_map xs = T_map xs"
   by (induction xs) auto
 
+fun my_map :: "'a list \<Rightarrow> 'b list" where
+  "my_map l = map l"
+time_fun my_map
+
 fun map2 :: "('b \<Rightarrow> 'c) \<Rightarrow> 'a list \<Rightarrow> 'c list" where
   "map2 _ [] = []"
 | "map2 g (x#xs) = g (f x) # map2 g xs"
