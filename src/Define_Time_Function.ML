@@ -391,8 +391,19 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
             in
               SOME (Const (T_nm, binderT ---> finT))
             end
-           (* Case for inside of locale, probably also needs type adjustments *)
-           | f $ a => SOME (f $ a)
+           (* Case for inside of locale, would need type *)
+           | f as (_$_) =>
+            let
+              val ((T_nm,T_T), fixes) = Term.strip_comb f |>> Term.dest_Const
+              val (T_Ts, finT) = Term.strip_type T_T
+              fun col_Used i (Type ("fun", [Type ("fun", _), Ts])) (Type ("fun", [T', Ts'])) =
+                (if is_Used T' then [i] else []) @ col_Used (i+1) Ts Ts'
+                | col_Used i (Type ("fun", [_, Ts])) (Type ("fun", [_, Ts'])) = col_Used (i+1) Ts Ts'
+                | col_Used _ _ _ = []
+              val binderT = change_typ' (contains (col_Used 0 T (drop (length fixes) T_Ts ---> finT))) T |> Term.binder_types
+            in
+              SOME (Term.list_comb (Const (T_nm, (take (length fixes) T_Ts) ---> binderT ---> finT), fixes))
+            end
            | _ => error ("Timing function of " ^ nm ^ " is not defined")
     end
       | time_term _ _ _ = error "Internal error: No valid function given"
