@@ -391,6 +391,8 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
             in
               SOME (Const (T_nm, binderT ---> finT))
             end
+           (* Case for inside of locale, probably also needs type adjustments *)
+           | f $ a => SOME (f $ a)
            | _ => error ("Timing function of " ^ nm ^ " is not defined")
     end
       | time_term _ _ _ = error "Internal error: No valid function given"
@@ -479,7 +481,8 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
     let
       fun get_T (Free (_,T)) = T
         | get_T (Const (_,T)) = T
-        | get_T (_ $ (Free (_,Type (_, [_, T])))) = T (* Case of snd was constructed *)
+        | get_T (Const ("Product_Type.prod.snd",_) $ (Free (_,Type (_, [_, T])))) = T (* Case of snd was constructed *)
+        | get_T (h $ _) = (case get_T h of Type ("fun", [_,T]) => T | _ => error "Internal error: Not a locale func")
         | get_T _ = error "Internal error: Forgotten type"
       val func = (case fun_to_time (#ctxt wctxt) (#origins wctxt) func
         of SOME t => SOME (WRAP_FUNCTION (list_comb (t, funcc_conv_args wctxt (get_T t) args)))
