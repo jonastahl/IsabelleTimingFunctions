@@ -281,34 +281,10 @@ fun fixTerms ctxt (term: term list) (fixedNum: int) (t as pT $ (eq $ l $ r)) =
     val _ = check_args "args" (strip_comb (get_l t))
     val l' = shortApp fixedNum (strip_comb l) |> list_comb
     val shortOriginFunc' = shortOriginFunc (term |> map (fst o strip_comb)) fixedNum
-    val consts = Proof_Context.consts_of ctxt
-    val net = Consts.revert_abbrevs consts ["internal"] |> hd |> Item_Net.content
-                (* filter out consts *)
-              |> filter (is_Const o fst o strip_comb o fst)
-                (* filter out abbreviations for locales *)
-              |> filter (fn n => "local"
-                  = (n |> snd |> strip_comb |> fst |> dest_Const_name |> split_name |> hd))
-              |> filter (fn n => (n |> fst |> strip_comb |> fst |> dest_Const_name |> split_name |> List.last) =
-                (n |> snd |> strip_comb |> fst |> dest_Const_name |> split_name |> List.last))
-              |> map (fst #> strip_comb #>> dest_Const_name ##> length)
-    fun n_abbrev (Const (nm,_)) =
-    let
-      val f = filter (fn n => fst n = nm) net
-    in
-      if length f >= 1 then f |> hd |> snd else 0
-    end
-      | n_abbrev _ = 0
     val r' = walk ctxt term {
           funcc = (fn wctxt => fn t => fn args =>
-            let
-              val n_abb = n_abbrev t
-              val t = case t of Const (nm,T) => Const (nm, T |> strip_type |>> drop n_abb |> (op --->))
-                              | t => t
-              val args = drop n_abb args           
-            in
-              (check_args "func" (t,args);
-               (#f wctxt t, map (#f wctxt) args) |> shortOriginFunc' |> list_comb)
-            end),
+            (check_args "func" (t,args);
+               (#f wctxt t, map (#f wctxt) args) |> shortOriginFunc' |> list_comb)),
           constc = fn wctxt => map_abs (#f wctxt),
           ifc = Iif,
           casec = fixCasec,
@@ -363,6 +339,35 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
     val finT = if #partial config then natOptT else HOLogic.natT
     val some = @{term "Some::nat \<Rightarrow> nat option"}
 
+    (* Convert implicit capturing functions in locales to their basic version *)
+    val consts = Proof_Context.consts_of lthy
+    val net = Consts.revert_abbrevs consts ["internal"] |> hd |> Item_Net.content
+                (* filter out consts *)
+              |> filter (is_Const o fst o strip_comb o fst)
+                (* filter out abbreviations for locales *)
+              |> filter (fn n => "local"
+                  = (n |> snd |> strip_comb |> fst |> dest_Const_name |> split_name |> hd))
+              |> filter (fn n => (n |> fst |> strip_comb |> fst |> dest_Const_name |> split_name |> List.last) =
+                (n |> snd |> strip_comb |> fst |> dest_Const_name |> split_name |> List.last))
+              |> map (fst #> strip_comb #>> dest_Const_name ##> length)
+    fun n_abbrev (Const (nm,_)) =
+    let
+      val f = filter (fn n => fst n = nm) net
+    in
+      if length f >= 1 then f |> hd |> snd else 0
+    end
+      | n_abbrev _ = 0
+    fun simpLocFunc (t: term) (args: term list) =
+      let
+        val n_abb = n_abbrev t
+        val simp_t = case t of Const (nm,T) => Const (nm, T |> strip_type |>> drop n_abb |> (op --->))
+                        | t => t
+        val simp_args = drop n_abb args 
+      in
+        if Term.is_Const t andalso contains (term |> map (Term.dest_Const_name o fst o strip_comb)) (t |> Term.dest_Const_name)
+        then (t, args) else (simp_t, simp_args)
+      end
+
     (* change type of original function to new type (_ \<Rightarrow> ... \<Rightarrow> _ to _ \<Rightarrow> ... \<Rightarrow> nat)
         and replace all function arguments f with (t*T_f) if used *)
     fun change_typ' used (Type ("fun", [T1, T2])) = 
@@ -404,7 +409,7 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
             in
               SOME (Term.list_comb (Const (T_nm, (take (length fixes) T_Ts) ---> binderT ---> finT), fixes))
             end
-           | _ => error ("Timing function of " ^ nm ^ " is not defined")
+           | f => error ("Timing function of " ^ nm ^ " is not defined")
     end
       | time_term _ _ _ = error "Internal error: No valid function given"
 
@@ -490,6 +495,7 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
       | funcc_conv_args _ _ _ = error "Internal error: Non matching type"
     fun funcc wctxt func args =
     let
+      val (func, args) = simpLocFunc func args
       fun get_T (Free (_,T)) = T
         | get_T (Const (_,T)) = T
         | get_T (Const ("Product_Type.prod.snd",_) $ (Free (_,Type (_, [_, T])))) = T (* Case of snd was constructed *)

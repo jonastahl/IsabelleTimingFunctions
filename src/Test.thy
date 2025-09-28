@@ -1,5 +1,6 @@
 theory Test
   imports Define_Time_Function
+  "HOL-Data_Structures.Map_Specs"
 begin
 
 chapter \<open>Definition on example\<close>
@@ -501,5 +502,31 @@ partial_function (tailrec) partdummy :: "nat \<Rightarrow> nat" where
 definition "user k = partdummy k"
 time_partial_function partdummy
 time_fun user
+
+locale Count_List = Map where update = update for update :: "'a \<Rightarrow> nat \<Rightarrow> 'm \<Rightarrow> 'm" +
+fixes T_lookup :: "'m \<Rightarrow> 'a \<Rightarrow> nat"
+and T_update :: "'a \<Rightarrow> nat \<Rightarrow> 'm \<Rightarrow> nat"
+begin
+
+definition lookup_nat :: "'m \<Rightarrow> 'a \<Rightarrow> nat" where
+"lookup_nat m x = (case lookup m x of None \<Rightarrow> 0 | Some n \<Rightarrow> n)"
+
+time_definition lookup_nat
+
+fun count :: "'m \<Rightarrow> 'a list \<Rightarrow> 'm" where
+"count m [] = m" |
+"count m (x#xs) = count (update x (lookup_nat m x + 1) m) xs"
+fun t_count :: "'m \<Rightarrow> 'a list \<Rightarrow> nat" where
+  "t_count m [] = 1"
+| "t_count m (x#xs) = t_count (update x (lookup_nat m x + 1) m) xs
+    + T_update x (lookup_nat m x + 1) m
+    + T_lookup_nat m x
+    + 1"
+
+time_fun count
+lemma "T_count m xs = t_count m xs"
+  by (induction xs arbitrary: m) auto
+
+end
 
 end
