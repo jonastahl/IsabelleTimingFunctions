@@ -529,4 +529,16 @@ lemma "T_count m xs = t_count m xs"
 
 end
 
+locale LetcF =
+  fixes f :: "nat \<Rightarrow> nat"
+  fixes T_f :: "nat \<Rightarrow> nat"
+begin
+
+fun J :: "nat \<Rightarrow> nat" where
+  "J (Suc a) = (let b = J a in f b)"
+| "J 0 = 0"
+time_fun J
+
+end
+
 end

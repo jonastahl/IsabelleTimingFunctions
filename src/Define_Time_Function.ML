@@ -258,13 +258,13 @@ fun fixCasecCases _ [t] = [t]
   | fixCasecCases wctxt (t::ts) =
     let
       val num = fastype_of t |> strip_type |> fst |> length
-      val c' = Term.strip_abs_eta num t |> list_abs
+      val c' = Term.strip_abs_eta num t ||> #f wctxt |> list_abs
     in
       c' :: fixCasecCases wctxt ts
     end
   | fixCasecCases _ _ = error "Internal error: invalid case types/terms"
 fun fixCasec wctxt t args =
-      (check_args "cases" (t,args); list_comb (t,fixCasecCases wctxt args))
+      (check_args "cases" (t,args); list_comb ((#f wctxt) t,fixCasecCases wctxt args))
 
 fun shortFunc fixedNum (Const (nm,T)) = 
     Const (nm,T |> strip_type |>> drop fixedNum |> (op --->))
@@ -295,6 +295,23 @@ fun fixTerms ctxt (term: term list) (fixedNum: int) (t as pT $ (eq $ l $ r)) =
     pT $ (eq $ l' $ r')
   end
   | fixTerms _ _ _ _ = error "Internal error: invalid term"
+fun postFixTerms ctxt (term: term list) (pT $ (eq $ l $ r)) =
+  let
+    val r' = walk ctxt term {
+          funcc = (fn wctxt => fn t => fn args =>
+            case List.find (fn el => Term.is_Const t
+              andalso (Term.dest_Const_name (strip_comb el |> fst)) = (Term.dest_Const_name t)) term of
+              SOME t => list_comb (t, map (#f wctxt) args)
+            | NONE => list_comb (#f wctxt t, map (#f wctxt) args)),
+          constc = Iconst,
+          ifc = Iif,
+          casec = Icase,
+          letc = Ilet
+      } r
+  in
+    pT $ (eq $ l $ r')
+  end
+  | postFixTerms _ _ _ = error "Internal error: invalid term"
 
 (* 2. Check for properties about the function *)
 (* 2.1 Check if function is recursive *)
@@ -341,6 +358,7 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
 
     (* Convert implicit capturing functions in locales to their basic version *)
     val consts = Proof_Context.consts_of lthy
+    val full_term = term
     val net = Consts.revert_abbrevs consts ["internal"] |> hd |> Item_Net.content
                 (* filter out consts *)
               |> filter (is_Const o fst o strip_comb o fst)
@@ -409,7 +427,7 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
             in
               SOME (Term.list_comb (Const (T_nm, (take (length fixes) T_Ts) ---> binderT ---> finT), fixes))
             end
-           | f => error ("Timing function of " ^ nm ^ " is not defined")
+           | _ => error ("Timing function of " ^ nm ^ " is not defined")
     end
       | time_term _ _ _ = error "Internal error: No valid function given"
 
@@ -421,9 +439,9 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
     (* Conversion of function term *)
     fun fun_to_time' ctxt (origin: term list) second (func as Const (nm,T)) =
     let
-      val origin' = map (fst o strip_comb) origin
+      val origin' = map (Term.dest_Const_name o fst o strip_comb) origin
     in
-      if contains' const_comp origin' func then SOME (Free (func |> Term.term_name |> fun_name_to_time' ctxt true second, change_typ T)) else
+      if contains origin' nm then SOME (Free (func |> Term.term_name |> fun_name_to_time' ctxt true second, change_typ T)) else
       if Zero_Funcs.is_zero (Proof_Context.theory_of ctxt) (nm,T) then NONE else
         time_term ctxt false func
     end
@@ -857,6 +875,7 @@ fun reg_time_func (lthy: local_theory) (term: term list) (terms: term list) (con
       | fSnd t = t
     val T_terms = map (convert_term lthy term is_rec) terms
       |> map (map_r (replaceFstSndFree lthy term fFst fSnd))
+      |> map (postFixTerms lthy full_term)
 
     val simpables = (if #simp config
       then find_simplifyble lthy term T_terms
