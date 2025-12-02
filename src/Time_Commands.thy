@@ -3,11 +3,10 @@ Author: Jonas Stahl
 
 Automatic definition of step-counting running-time functions from HOL functions
 following the translation described in Section 1.5, Running Time, of the book
-Functional Data Structures and Algorithms. A Proof Assistant Approach.
-See https://functional-algorithms-verified.org
+Functional Data Structures and Algorithms. A Proof Assistant Approach. https://fdsa-book.net
 *)
 
-theory Define_Time_Function
+theory Time_Commands
   imports Main
   keywords "time_fun" :: thy_decl
     and    "time_function" :: thy_decl
@@ -17,8 +16,8 @@ theory Define_Time_Function
     and    "time_fun_0" :: thy_decl
 begin
 
-ML_file Define_Time_0.ML
-ML_file Define_Time_Function.ML
+ML_file Time_Commands_0.ML
+ML_file Time_Commands.ML
 
 declare [[time_prefix = "T_"]]
 
@@ -33,7 +32,6 @@ running-time function \<open>T_f\<close>. For all auxiliary functions used by \<
 running time functions must already have been defined.
 If the definition of the function requires a manual termination proof,
 use \<open>time_function\<close> accompanied by a \<open>termination\<close> command.
-Limitation: The commands do not work properly in locales yet.
 
 The pre-defined functions below are assumed to have constant running time.
 In fact, we make that constant 0.
