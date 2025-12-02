@@ -242,11 +242,22 @@ fun check_definition [t] = [t]
   | check_definition _ = error "Only a single definition is allowed"
 fun get_terms theory (term: term) =
 let
-  val equations = Spec_Rules.retrieve theory term
-      |> map #rules
-      |> map (map Thm.prop_of)
-   handle Empty => error "Function or terms of function not found"
-  val _ = if equations = [] then error "No terms found" else ()
+  (* Desired way to retrieve equations, but creates errors at some points
+  val equations = [#input_eqns (Function.get_info theory term)]
+    handle Empty =>
+      Spec_Rules.retrieve theory term
+        |> map #rules
+        |> map (map Thm.prop_of)
+    handle Empty => error "Function or terms of function not found" *)
+  (* Use get_info as fallback instead till errors are fixed *)
+  val equations =
+      Spec_Rules.retrieve theory term
+        |> map #rules
+        |> map (map Thm.prop_of)
+    handle Empty => error "Function or terms of function not found"
+  val equations = if equations <> [] then equations else
+    [#input_eqns (Function.get_info theory term)]
+    handle Empty => error "Function or terms of function not found"
 in
   equations
     |> map (map fix_definition)
