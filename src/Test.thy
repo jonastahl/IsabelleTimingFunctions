@@ -1,5 +1,5 @@
 theory Test
-  imports Define_Time_Function
+  imports Time_Commands
   "HOL-Data_Structures.Map_Specs"
 begin
 
@@ -374,6 +374,7 @@ fun t_map2 :: "('b \<Rightarrow> nat) \<Rightarrow> 'a list \<Rightarrow> nat" w
   "t_map2 _ [] = 1"
 | "t_map2 T_g (x#xs) = T_f x + T_g (f x) + t_map2 T_g xs + 1"
 time_fun map2
+
 lemma "t2_map2 g xs = T2_map2 g xs"
   by (induction xs) auto
 
